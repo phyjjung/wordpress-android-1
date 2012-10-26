@@ -1,6 +1,7 @@
 package org.wordpress.android;
 
 import java.io.UnsupportedEncodingException;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,6 +21,7 @@ import org.wordpress.android.util.WPTitleBar.OnBlogChangedListener;
 import org.xmlrpc.android.ApiHelper;
 import org.xmlrpc.android.XMLRPCClient;
 import org.xmlrpc.android.XMLRPCException;
+import org.xmlrpc.android.XMLRPCFault;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -34,6 +36,7 @@ import android.graphics.PixelFormat;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.telephony.TelephonyManager;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -41,6 +44,12 @@ import android.view.WindowManager;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.Toast;
+
+import com.google.android.apps.authenticator.PasscodeGenerator;
+import com.google.android.apps.authenticator.PasscodeGenerator.Signer;
+import com.google.android.apps.authenticator.TotpClock;
+import com.google.android.apps.authenticator.TotpCounter;
+import com.google.android.apps.authenticator.Utilities;
 
 public class Dashboard extends Activity {
 	private int id;
@@ -86,6 +95,9 @@ public class Dashboard extends Activity {
 					getString(R.string.decline), negativeListener);
 		} else {
 			displayAccounts();
+			if (WordPress.currentBlog != null) {
+				new refreshBlogContentTask().execute(true);
+			}
 		}
 	}
 
@@ -143,6 +155,10 @@ public class Dashboard extends Activity {
 		MenuItem menuItem4 = menu.findItem(3);
 		menuItem4.setIcon(android.R.drawable.ic_menu_info_details);
 
+		menu.add(0, 4, 0, getResources().getText(R.string.twostep));
+		MenuItem menuItem5 = menu.findItem(4);
+		menuItem5.setIcon(android.R.drawable.ic_menu_preferences);
+
 		return true;
 	}
 
@@ -199,6 +215,10 @@ public class Dashboard extends Activity {
 		case 3:
 			Intent intent = new Intent(this, About.class);
 			startActivity(intent);
+			return true;
+		case 4:
+			Intent i4 = new Intent(this, TwoStep.class);
+			startActivity(i4);
 			return true;
 		}
 		return false;
@@ -375,19 +395,32 @@ public class Dashboard extends Activity {
 	}
 
 	private class refreshBlogContentTask extends AsyncTask<Boolean, Void, Boolean> {
+		private boolean warnAboutTwostepAppPassword = false;
 
 		// refreshes blog level info (WP version number) and stuff related to
 		// theme (available post types, recent comments etc)
 		@Override
 		protected void onPostExecute(Boolean result) {
 			if (!isFinishing()) {
-				Thread action = new Thread() {
-					public void run() {
-						titleBar.stopRotatingRefreshIcon();
-						titleBar.updateCommentBadge();
-					}
-				};
-				runOnUiThread(action);
+				titleBar.stopRotatingRefreshIcon();
+				titleBar.updateCommentBadge();
+				if (warnAboutTwostepAppPassword) {
+					AlertDialog.Builder dialogBuilder = new AlertDialog.Builder(Dashboard.this);
+					dialogBuilder.setTitle(R.string.two_step_authentication);
+					dialogBuilder.setMessage(R.string.two_step_auto_setup_app_password);
+					dialogBuilder.setPositiveButton(getResources().getText(R.string.yes), new DialogInterface.OnClickListener() {
+						public void onClick(DialogInterface dialog, int whichButton) {
+							new setupTwostepAppPassword().execute();
+						}
+					});
+					dialogBuilder.setNegativeButton(getResources().getText(R.string.no), new DialogInterface.OnClickListener() {
+						public void onClick(DialogInterface dialog, int whichButton) {
+							// just close the window
+						}
+					});
+					dialogBuilder.setCancelable(false);
+					dialogBuilder.create().show();
+				}
 			}
 		}
 
@@ -448,12 +481,73 @@ public class Dashboard extends Activity {
 			try {
 				ApiHelper.refreshComments(Dashboard.this, commentParams);
 			} catch (XMLRPCException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				if (e.getCause() instanceof XMLRPCFault) {
+					XMLRPCFault fault = (XMLRPCFault) e.getCause();
+					if (fault.getFaultCode() == 425) {
+						if (WordPress.wpDB.getTwostepSecret() == null) {
+							Log.e("WordPress", "Error doing two step login", e);
+							return false;
+						}
+						warnAboutTwostepAppPassword = true;
+					}
+				} else {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 			}
 
 			return true;
 		}
 
 	}
+
+	private class setupTwostepAppPassword extends AsyncTask<Void, Void, Boolean> {
+		@Override
+		protected void onPostExecute(Boolean result) {
+		}
+
+		@Override
+		protected Boolean doInBackground(Void...args) {
+			TotpClock mTotpClock = new TotpClock(Dashboard.this);
+			TotpCounter mTotpCounter = new TotpCounter(PasscodeGenerator.INTERVAL);
+			String secret = WordPress.wpDB.getTwostepSecret();
+			String otpCode;
+			if (secret == null || secret.length() == 0) {
+				return false;
+			}
+
+			long otp_state = mTotpCounter.getValueAtTime(Utilities
+					.millisToSeconds(mTotpClock.currentTimeMillis()));
+
+			try {
+				Signer signer = TwoStep.getSigningOracle(secret);
+				PasscodeGenerator pcg = new PasscodeGenerator(signer, TwoStep.PIN_LENGTH);
+
+				otpCode = pcg.generateResponseCode(otp_state);
+			} catch (GeneralSecurityException e) {
+				return false;
+			}
+
+			Blog blog = WordPress.currentBlog;
+			// Use wordpress.com/xmlrpc.php url directly to make sure we're using HTTPS
+			XMLRPCClient client = new XMLRPCClient("https://wordpress.com/xmlrpc.php", blog.getHttpuser(), blog.getHttppassword());
+			Object[] appPasswordParams = { blog.getUsername(), blog.getPassword(), otpCode, "WordPress for Android" };
+			try {
+				String appPassword = (String) client.call("wpcom.addApplicationPassword", appPasswordParams);
+				if (appPassword != null) {
+					// Verify that the application password is working before saving it to the DB
+					HashMap<String, Object> hPost = new HashMap<String, Object>();
+					hPost.put("number", 30);
+					Object[] commentParams = { blog.getBlogId(), blog.getUsername(), appPassword, hPost };
+					ApiHelper.refreshComments(Dashboard.this, commentParams);
+
+					blog.setApplicationPassword(appPassword);
+					blog.save(Dashboard.this, blog.getUsername());
+				}
+			} catch (XMLRPCException e) {
+				Log.e("WordPress", "Invalid app specific password?", e);
+			}
+			return true;
+		}
+}
 }

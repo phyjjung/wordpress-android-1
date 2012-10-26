@@ -140,6 +140,12 @@
         <activity
             android:name="EditComment"
             android:configChanges="orientation|keyboardHidden" />
+        <activity
+            android:name="TwoStep"
+            android:configChanges="orientation|keyboardHidden"
+            android:label="@string/title_activity_two_step"
+            android:theme="@android:style/Theme.Dialog" >
+        </activity>
     </application>
 
 </manifest>

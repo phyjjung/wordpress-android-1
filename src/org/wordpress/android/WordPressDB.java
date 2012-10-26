@@ -26,7 +26,7 @@ import javax.crypto.spec.DESKeySpec;
 
 public class WordPressDB {
 
-	private static final int DATABASE_VERSION = 14;
+	private static final int DATABASE_VERSION = 15;
 
 	private static final String CREATE_TABLE_SETTINGS = "create table if not exists accounts (id integer primary key autoincrement, "
 			+ "url text, blogName text, username text, password text, imagePlacement text, centerThumbnail boolean, fullSizeImage boolean, maxImageWidth text, maxImageWidthId integer, lastCommentId integer, runService boolean);";
@@ -34,9 +34,11 @@ public class WordPressDB {
 			+ "read integer not null, interval text, statsdate integer);";
 	private static final String CREATE_TABLE_MEDIA = "create table if not exists media (id integer primary key autoincrement, "
 			+ "postID integer not null, filePath text default '', fileName text default '', title text default '', description text default '', caption text default '', horizontalAlignment integer default 0, width integer default 0, height integer default 0, mimeType text default '', featured boolean default false, isVideo boolean default false);";
+	private static final String CREATE_TABLE_TWOSTEP = "create table if not exists twostep (secret text not null);";
 	private static final String SETTINGS_TABLE = "accounts";
 	private static final String DATABASE_NAME = "wordpress";
 	private static final String MEDIA_TABLE = "media";
+	private static final String TWOSTEP_TABLE = "twostep";
 
 	private static final String CREATE_TABLE_POSTS = "create table if not exists posts (id integer primary key autoincrement, blogID text, "
 			+ "postid text, title text default '', dateCreated date, date_created_gmt date, categories text default '', custom_fields text default '', "
@@ -115,6 +117,10 @@ public class WordPressDB {
 	// add home url to blog settings
 	private static final String ADD_HOME_URL = "alter table accounts add homeURL text default '';";
 	
+	// store original password if we're using an application password for two
+	// step auth
+	private static final String ADD_ORIGINAL_PASSWORD = "alter table accounts add originalPassword text";
+
 	private SQLiteDatabase db;
 
 	protected static final String PASSWORD_SECRET = "nottherealpasscode";
@@ -135,6 +141,7 @@ public class WordPressDB {
 		db.execSQL(CREATE_TABLE_CATEGORIES);
 		db.execSQL(CREATE_TABLE_QUICKPRESS_SHORTCUTS);
 		db.execSQL(CREATE_TABLE_MEDIA);
+		db.execSQL(CREATE_TABLE_TWOSTEP);
 
 		try {
 			if (db.getVersion() < 1) { // user is new install
@@ -449,6 +456,9 @@ public class WordPressDB {
 			} else if (db.getVersion() == 13) {
 				db.execSQL(ADD_HOME_URL);
 				db.setVersion(DATABASE_VERSION);
+			} else if (db.getVersion() == 14) {
+				db.execSQL(ADD_ORIGINAL_PASSWORD);
+				db.setVersion(DATABASE_VERSION);
 			}
 		} catch (SQLException e) {
 			e.printStackTrace();
@@ -485,13 +495,14 @@ public class WordPressDB {
 	public Vector<HashMap<String, Object>> getAccounts(Context ctx) {
 
 		Cursor c = db.query(SETTINGS_TABLE, new String[] { "id", "blogName",
-				"username", "runService", "blogId", "url" }, null, null, null,
+				"username", "runService", "blogId", "url", "dotcomFlag" }, null, null, null,
 				null, null);
 		int id;
 		String blogName, username, url;
 		int blogId;
 		int runService;
 		int numRows = c.getCount();
+		boolean dotcomFlag;
 		c.moveToFirst();
 		Vector<HashMap<String, Object>> accounts = new Vector<HashMap<String, Object>>();
 		for (int i = 0; i < numRows; i++) {
@@ -502,6 +513,7 @@ public class WordPressDB {
 			runService = c.getInt(3);
 			blogId = c.getInt(4);
 			url = c.getString(5);
+			dotcomFlag = c.getInt(6)>0;
 			if (id > 0) {
 				HashMap<String, Object> thisHash = new HashMap<String, Object>();
 				thisHash.put("id", id);
@@ -510,6 +522,7 @@ public class WordPressDB {
 				thisHash.put("runService", runService);
 				thisHash.put("blogId", blogId);
 				thisHash.put("url", url);
+				thisHash.put("dotcomFlag", dotcomFlag);
 				accounts.add(thisHash);
 			}
 			c.moveToNext();
@@ -659,7 +672,7 @@ public class WordPressDB {
 				"maxImageWidth", "maxImageWidthId", "runService", "blogId",
 				"location", "dotcomFlag", "dotcom_username", "dotcom_password",
 				"api_key", "api_blogid", "wpVersion", "postFormats",
-				"lastCommentId","isScaledImage","scaledImgWidth", "homeURL" }, "id=" + id, null, null, null, null);
+				"lastCommentId","isScaledImage","scaledImgWidth", "homeURL", "originalPassword" }, "id=" + id, null, null, null, null);
 
 		int numRows = c.getCount();
 		c.moveToFirst();
@@ -700,6 +713,7 @@ public class WordPressDB {
 				returnVector.add(c.getInt(22));
 				returnVector.add(c.getInt(23));
 				returnVector.add(c.getString(24));
+				returnVector.add(decryptPassword(c.getString(25)));
 			} else {
 				returnVector = null;
 			}
@@ -1804,4 +1818,31 @@ public class WordPressDB {
 		return false;
 	}
 
+	public void setTwostepSecret(String secret) {
+		if (secret == null) {
+			db.delete(TWOSTEP_TABLE, null, null);
+			return;
+		}
+		ContentValues values = new ContentValues();
+		values.put("secret", encryptPassword(secret));
+		int result = db.update(TWOSTEP_TABLE, values, null, null);
+		if (0 == result) {
+			db.insert(TWOSTEP_TABLE, null, values);
+		}
+	}
+
+	public String getTwostepSecret() {
+		Cursor c = db.query(TWOSTEP_TABLE, new String[] { "secret" }, null,
+				null, null, null, null, "1");
+		if (c.getCount() == 0)
+			return null;
+
+		c.moveToFirst();
+		String secret = c.getString(0);
+		return decryptPassword(secret);
+	}
+
+	public void removeTwostepSecret() {
+		setTwostepSecret(null);
+	}
 }

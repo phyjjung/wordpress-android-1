@@ -744,7 +744,28 @@
     INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE
     OF THE PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH
     HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH
-    DAMAGES.\n\nEND OF TERMS AND CONDITIONS
-  </string>
+    DAMAGES.\n\nEND OF TERMS AND CONDITIONS</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="menu_settings">Settings</string>
+    <string name="twostep">Two-step auth</string>
+    <string name="title_activity_two_step">Two Step Authentication</string>
+    <string name="enter_provided_key">Enter provided key</string>
+    <string name="scan_a_barcode">Scan a barcode</string>
+    <string name="setup_two_step_authentication">Setup Two Step authentication</string>
+    <string name="two_step_authentication">Two Step Authentication</string>
+    <!-- Error message displayed when scanned QR code is not recognized as valid format -->
+    <string name="error_uri">Key not recognized.</string>
 
+    <!--
+       Title for error message dialog when user attempts to scan a barcode but does not
+       have the barcode scanner application installed.
+    -->
+    <string name="install_dialog_title">Install barcode scanner?</string>
+
+    <!-- Error message displayed when user attempts to scan a barcode without a scanner app. -->
+    <string name="install_dialog_message">    To scan barcodes containing keys, you must install the ZXing barcode scanner.</string>
+
+    <!-- Text on button user clicks to start installation of barcode scanning app -->
+    <string name="install_button">Install</string>
+    <string name="two_step_auto_setup_app_password">Do you want to automaticaly change your stored password to an application specific password?</string>
 </resources>

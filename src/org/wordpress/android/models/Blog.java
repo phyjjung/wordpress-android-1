@@ -36,6 +36,7 @@ public class Blog {
 	private String httpuser;
 	private String httppassword;
 	private String postFormats;
+	private String originalPassword;
 	
 	public Blog(int blog_id, Context ctx) throws Exception{
 		//instantiate a new blog
@@ -127,6 +128,16 @@ public class Blog {
 
 	public void setPassword(String password) {
 		this.password = password;
+	}
+
+	public void setApplicationPassword(String password) {
+		this.originalPassword = this.password;
+		this.setPassword(password);
+	}
+
+	public void restoreOriginalPassword() {
+		this.password = this.originalPassword;
+		this.originalPassword = null;
 	}
 
 	public String getImagePlacement() {
