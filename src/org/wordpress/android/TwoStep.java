@@ -13,6 +13,12 @@ import android.app.Dialog;
 import android.content.ActivityNotFoundException;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
+import android.graphics.drawable.ShapeDrawable;
+import android.graphics.drawable.shapes.RectShape;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
@@ -144,6 +150,28 @@ public class TwoStep extends Activity {
 		mTotpCountdownTask.setListener(new TotpCountdownTask.Listener() {
 			@Override
 			public void onTotpCountdown(long millisRemaining) {
+				TextView otp_code = (TextView) findViewById(R.id.otp_code);
+				int progressWidth = (int) Math.round(((30000 - millisRemaining)/30000.0) * otp_code.getWidth());
+				Rect bounds[] = new Rect[2];
+				ShapeDrawable background = new ShapeDrawable(new RectShape());
+				bounds[0] = new Rect(0, 0, otp_code.getWidth(), otp_code.getHeight());
+				background.getPaint().setColor(Color.BLACK);
+				ShapeDrawable progess = new  ShapeDrawable(new RectShape());
+				bounds[1] = new Rect(0, 0, progressWidth, otp_code.getHeight());
+				progess.getPaint().setColor(Color.rgb(50, 50, 50));
+				Drawable layers[] = { background, progess };
+				LayerDrawable ld = new LayerDrawable(layers);
+				ld.setBounds(bounds[0]);
+				for (int i = 0; i < ld.getNumberOfLayers(); i++) {
+		            ld.getDrawable(i).setBounds(bounds[i]);
+		        }
+				otp_code.setBackgroundDrawable(ld);
+				if (millisRemaining < 10000) {
+					int gbValue = Math.round(200 * millisRemaining / 10000);
+					otp_code.setTextColor(Color.rgb(200, gbValue, gbValue));
+				} else {
+					otp_code.setTextColor(Color.rgb(200, 200, 200));
+				}
 				return;
 			}
 
