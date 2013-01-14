@@ -531,6 +531,28 @@ public class WordPressDB {
 
 		return accounts;
 	}
+	
+	public Vector<HashMap<String, Object>> getDotcomAccounts(Context ctx) {
+		Cursor c = db.query(SETTINGS_TABLE, new String[] { "id", "username" }, "dotcomFlag = 1", null, "username", null, null);
+		int numRows = c.getCount();
+		Vector<HashMap<String, Object>> accounts = new Vector<HashMap<String, Object>>();
+
+		c.moveToFirst();
+		for (int i = 0; i < numRows; i++) {
+			int id = c.getInt(0);
+			String username = c.getString(1);
+			if (id > 0) {
+				HashMap<String, Object> thisHash = new HashMap<String, Object>();
+				thisHash.put("id", id);
+				thisHash.put("username", username);
+				accounts.add(thisHash);
+			}
+			c.moveToNext();
+		}
+		c.close();
+		
+		return accounts;
+	}
 
 	public boolean checkMatch(String blogName, String blogURL, String username) {
 

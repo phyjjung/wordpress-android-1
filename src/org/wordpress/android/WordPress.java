@@ -10,7 +10,8 @@ import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 
 public class WordPress extends Application {
-	
+	public final static String GCM_SENDER_ID = "108380595987";
+
 	public static String versionName;
 	public static Blog currentBlog;
 	public static Comment currentComment;

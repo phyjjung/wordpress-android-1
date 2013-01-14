@@ -6,8 +6,8 @@
     android:versionName="2.2.3" >
 
     <uses-sdk
-        android:minSdkVersion="7"
-        android:targetSdkVersion="10" />
+        android:minSdkVersion="8"
+        android:targetSdkVersion="16" />
 
     <supports-screens
         android:anyDensity="true"
@@ -24,15 +24,26 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="com.android.launcher.permission.INSTALL_SHORTCUT" />
     <uses-permission android:name="com.android.launcher.permission.UNINSTALL_SHORTCUT" />
+    <permission
+        android:name="org.wordpress.android.permission.C2D_MESSAGE"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="org.wordpress.android.permission.C2D_MESSAGE" />
+    <!-- App receives GCM messages. -->
+    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
+    <!-- GCM requires a Google account. -->
+    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+    <!-- Keeps the processor from sleeping when a message is received. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <uses-feature
+<uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
     <uses-feature
         android:name="android.hardware.location"
         android:required="false" />
-    <uses-feature android:name="android.hardware.touchscreen" 
-        android:required="false"/>
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false" />
 
     <application
         android:name="WordPress"
@@ -40,6 +51,19 @@
         android:icon="@drawable/app_icon"
         android:label="WordPress"
         android:theme="@style/WordPress" >
+        <receiver
+            android:name="com.google.android.gcm.GCMBroadcastReceiver"
+            android:permission="com.google.android.c2dm.permission.SEND" >
+            <intent-filter>
+                <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+                <action android:name="com.google.android.c2dm.intent.REGISTRATION" />
+
+                <category android:name="org.wordpress.android" />
+            </intent-filter>
+        </receiver>
+
+        <service android:name=".GCMIntentService" />
+
         <activity
             android:name="Settings"
             android:configChanges="orientation|keyboardHidden"
