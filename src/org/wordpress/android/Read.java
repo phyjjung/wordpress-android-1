@@ -1,6 +1,7 @@
 package org.wordpress.android;
 
 import java.net.URLEncoder;
+import java.util.HashMap;
 import java.util.Vector;
 
 import org.apache.http.client.HttpClient;
@@ -9,6 +10,7 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.params.HttpProtocolParams;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.util.EncodingUtils;
+import org.json.JSONException;
 import org.wordpress.android.models.Blog;
 import org.wordpress.android.models.Post;
 import org.wordpress.android.util.EscapeUtils;
@@ -17,6 +19,7 @@ import com.actionbarsherlock.app.SherlockActivity;
 import com.actionbarsherlock.view.Menu;
 import com.actionbarsherlock.view.MenuItem;
 
+import android.annotation.SuppressLint;
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.res.Configuration;
@@ -36,6 +39,7 @@ import android.webkit.WebViewClient;
 import android.widget.ImageButton;
 import android.widget.Toast;
 
+@SuppressLint("SetJavaScriptEnabled")
 public class Read extends SherlockActivity {
 	/** Called when the activity is first created. */
 	public String[] authors;
@@ -167,6 +171,7 @@ public class Read extends SherlockActivity {
 		wv.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
 		wv.getSettings().setBuiltInZoomControls(true);
 		wv.getSettings().setJavaScriptEnabled(true);
+		wv.getSettings().setUserAgentString("wp-android");
 
 		wv.setWebChromeClient(new WebChromeClient() {
 			public void onProgressChanged(WebView view, int progress) {
@@ -195,7 +200,17 @@ public class Read extends SherlockActivity {
 		if (WordPress.currentPost != null) {
 			Post post = WordPress.currentPost;
 			String previewUrl = post.getPermaLink();
-			if (post.isLocalDraft() || post.isLocalChange() || post.getPost_status() != "publish") {
+			boolean isPrivate = false;
+			try {
+				HashMap<?, ?> blogPublicOption;
+				blogPublicOption = (HashMap<?, ?>) WordPress.currentBlog.getBlogOptions().get("blog_public");
+				String blogPublicOptionValue = blogPublicOption.get("value").toString();
+				if (blogPublicOptionValue.equals("-1")) {
+					isPrivate = true;
+				}
+			} catch (JSONException e) {
+			}
+			if (isPrivate || post.isLocalDraft() || post.isLocalChange() || !post.getPost_status().equals("publish")) {
 				if (-1 == previewUrl.indexOf('?')) {
 					previewUrl = previewUrl.concat("?preview=true");
 				} else {

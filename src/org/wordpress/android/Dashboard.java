@@ -391,6 +391,7 @@ public class Dashboard extends WPActionBarActivity {
 				hPost.put("software_version", "software_version");
 				hPost.put("post_thumbnail", "post_thumbnail");
 				hPost.put("jetpack_client_id", "jetpack_client_id");
+				hPost.put("blog_public", "blog_public");
 				Object[] vParams = { blog.getBlogId(), blog.getUsername(), blog.getPassword(), hPost };
 				Object versionResult = new Object();
 				try {
