@@ -1,5 +1,6 @@
 package org.wordpress.android;
 
+import java.net.URLEncoder;
 import java.util.Vector;
 
 import org.apache.http.client.HttpClient;
@@ -7,7 +8,9 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.params.HttpProtocolParams;
 import org.apache.http.protocol.HTTP;
+import org.apache.http.util.EncodingUtils;
 import org.wordpress.android.models.Blog;
+import org.wordpress.android.models.Post;
 import org.wordpress.android.util.EscapeUtils;
 
 import com.actionbarsherlock.app.SherlockActivity;
@@ -190,19 +193,23 @@ public class Read extends SherlockActivity {
 
 		wv.setWebViewClient(new WordPressWebViewClient());
 		if (WordPress.currentPost != null) {
-			int sdk_int = 0;
-			try {
-				sdk_int = Integer.valueOf(android.os.Build.VERSION.SDK);
-			} catch (Exception e1) {
-				sdk_int = 3; // assume they are on cupcake
-			}
-			if (sdk_int >= 8) {
-				// only 2.2 devices can load https correctly
-				wv.loadUrl(WordPress.currentPost.getPermaLink());
+			Post post = WordPress.currentPost;
+			String previewUrl = post.getPermaLink();
+			if (post.isLocalDraft() || post.isLocalChange() || post.getPost_status() != "publish") {
+				if (-1 == previewUrl.indexOf('?')) {
+					previewUrl = previewUrl.concat("?preview=true");
+				} else {
+					previewUrl = previewUrl.concat("&preview=true");
+				}
+				if (WordPress.currentBlog.getUrl().lastIndexOf("/") != -1)
+					loginURL = WordPress.currentBlog.getUrl().substring(0, WordPress.currentBlog.getUrl().lastIndexOf("/")) + "/wp-login.php";
+				else
+					loginURL = WordPress.currentBlog.getUrl().replace("xmlrpc.php", "wp-login.php");
+
+				String postData = String.format("log=%s&pwd=%s&redirect_to=%s", WordPress.currentBlog.getUsername(), WordPress.currentBlog.getPassword(), URLEncoder.encode(previewUrl)); 
+				wv.postUrl(loginURL, EncodingUtils.getBytes(postData, "utf-8"));
 			} else {
-				String url = WordPress.currentPost.getPermaLink().replace(
-						"https:", "http:");
-				wv.loadUrl(url);
+				wv.loadUrl(previewUrl);
 			}
 		}
 
